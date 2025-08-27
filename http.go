@@ -3,6 +3,7 @@ package ecloudsdk
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -42,6 +43,9 @@ func (c *DefaultEcloudClient) performRequest(ctx context.Context, method, url st
 		if req.Header.Get("Accept") == "" {
 			req.Header.Set("Accept", "application/json")
 		}
+
+		// Support for gzip
+		req.Header.Set("Accept-Encoding", "gzip")
 
 		// Execute request
 		resp, err := c.httpClient.Do(req)
@@ -90,21 +94,20 @@ type JSONRespError struct {
 	Error string `json:"error"`
 }
 
-func (c *DefaultEcloudClient) decodeError(resp *http.Response) error {
-	body, err := io.ReadAll(resp.Body)
+func (c *DefaultEcloudClient) decodeError(resp io.Reader) error {
+	body, err := io.ReadAll(resp)
 	if err != nil {
-		return fmt.Errorf("statusCode=%d: failed to read response body: %w", resp.StatusCode, err)
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var jsonErr JSONRespError
 	if err := json.Unmarshal(body, &jsonErr); err == nil && jsonErr.Error != "" {
-		return fmt.Errorf("statusCode=%d remote error: %s", resp.StatusCode, jsonErr.Error)
+		return fmt.Errorf("remote error: %s", jsonErr.Error)
 	}
 
 	// fallback: plain text or unknown structure
 	if len(body) == 0 {
-		return fmt.Errorf("statusCode=%d remote error: empty response body", resp.StatusCode)
+		return errors.New("empty response body")
 	}
-
-	return fmt.Errorf("statusCode=%d remote error: %s", resp.StatusCode, string(body))
+	return fmt.Errorf("remote error: %s", string(body))
 }

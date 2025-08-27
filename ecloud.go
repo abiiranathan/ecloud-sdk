@@ -2,6 +2,7 @@ package ecloudsdk
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -118,6 +119,25 @@ type DefaultEcloudClient struct {
 	authenticated bool
 }
 
+func getReader(response *http.Response) (io.ReadCloser, error) {
+	// Check that the server actually sent compressed data
+	var reader io.ReadCloser
+	var err error
+	contentEncoding := response.Header.Get("Content-Encoding")
+
+	switch contentEncoding {
+	case "gzip":
+		reader, err = gzip.NewReader(response.Body)
+		if err != nil {
+			return nil, fmt.Errorf("gzip.NewReader failed: %w", err)
+		}
+	default:
+		reader = response.Body
+	}
+	return reader, err
+
+}
+
 func NewEcloudClient(config *Config) (EcloudClient, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -164,14 +184,20 @@ func (c *DefaultEcloudClient) Login(ctx context.Context) (*LoginResponse, error)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+	if err := json.NewDecoder(reader).Decode(&loginResp); err != nil {
 		return nil, fmt.Errorf("error decoding login response: %w", err)
 	}
 
@@ -215,14 +241,20 @@ func (c *DefaultEcloudClient) GetBill(ctx context.Context) (*Bill, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	subscription := &Bill{}
-	err = json.NewDecoder(resp.Body).Decode(subscription)
+	err = json.NewDecoder(reader).Decode(subscription)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode json for bill: %w", err)
 	}
@@ -248,12 +280,19 @@ func (c *DefaultEcloudClient) Subscribe(ctx context.Context, req *SubscribeReque
 		return nil, fmt.Errorf("unable to subscribe patient: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	// Decode subscription into same struct
-	err = json.NewDecoder(resp.Body).Decode(sub)
+	err = json.NewDecoder(reader).Decode(sub)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode json: %w", err)
 	}
@@ -268,12 +307,19 @@ func (c *DefaultEcloudClient) GetSubscriber(ctx context.Context, subscriberID ui
 		return nil, fmt.Errorf("unable to fetch subscriber: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	subscriber := &Subscriber{}
-	err = json.NewDecoder(resp.Body).Decode(subscriber)
+	err = json.NewDecoder(reader).Decode(subscriber)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode subscriber json: %w", err)
 	}
@@ -289,12 +335,19 @@ func (c *DefaultEcloudClient) GetPatientSubscription(ctx context.Context, patien
 		return nil, fmt.Errorf("unable to fetch subscriber: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	subscriber := new(Subscriber)
-	err = json.NewDecoder(resp.Body).Decode(subscriber)
+	err = json.NewDecoder(reader).Decode(subscriber)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode json: %w", err)
 	}
@@ -308,12 +361,19 @@ func (c *DefaultEcloudClient) GetHospitalSubscribers(ctx context.Context) ([]*Su
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	var subscribers []*Subscriber
-	err = json.NewDecoder(resp.Body).Decode(&subscribers)
+	err = json.NewDecoder(reader).Decode(&subscribers)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode json: %w", err)
 	}
@@ -328,12 +388,19 @@ func (c *DefaultEcloudClient) GetPendingSubscribers(ctx context.Context) ([]*Sub
 		return nil, fmt.Errorf("unable to fetch pending subscribers: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	var subscribers []*Subscriber
-	err = json.NewDecoder(resp.Body).Decode(&subscribers)
+	err = json.NewDecoder(reader).Decode(&subscribers)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode json: %w", err)
 	}
@@ -372,12 +439,19 @@ func (c *DefaultEcloudClient) CreatePayment(ctx context.Context, subscriberID ui
 		return nil, fmt.Errorf("unable to subscribe patient: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	// Decode subscription into same struct
-	err = json.NewDecoder(resp.Body).Decode(payment)
+	err = json.NewDecoder(reader).Decode(payment)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode json: %w", err)
 	}
@@ -392,12 +466,19 @@ func (c *DefaultEcloudClient) GetSubscriberPayments(ctx context.Context, subscri
 		return nil, fmt.Errorf("unable to fetch payments: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, c.decodeError(resp)
+		return nil, c.decodeError(reader)
 	}
 
 	payments := []*Payment{}
-	err = json.NewDecoder(resp.Body).Decode(&payments)
+	err = json.NewDecoder(reader).Decode(&payments)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode json: %w", err)
 	}
@@ -523,8 +604,15 @@ func (c *DefaultEcloudClient) SyncMedicalRecords(ctx context.Context, patientRec
 		return fmt.Errorf("unable to sync medical records: %w", err)
 	}
 
+	// Get reader that can be plain body or gziped.
+	reader, err := getReader(resp)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return c.decodeError(resp)
+		return c.decodeError(reader)
 	}
 	return nil
 }
