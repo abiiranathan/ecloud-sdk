@@ -103,6 +103,9 @@ type EcloudClient interface {
 	SubscriptionService
 	PaymentService
 	RecordsService
+
+	// Returns a copy of the config.
+	Config() Config
 }
 
 // DefaultEcloudClient implements all interfaces
@@ -145,6 +148,10 @@ func NewEcloudClient(config *Config) (EcloudClient, error) {
 	}
 
 	return client, nil
+}
+
+func (c *DefaultEcloudClient) Config() Config {
+	return *c.config
 }
 
 // Authentication implementation
