@@ -14,6 +14,7 @@ var (
 	ErrHospitalNumberRequired  = errors.New("hospital number is required")
 	ErrApiBaseURLRequired      = errors.New("ecloud ApiBaseURL is required")
 	ErrEclinicIDRequired       = errors.New("ecloud ElinicID  is required")
+	ErrEclinicBaseURL          = errors.New("EclinicBaseURL is required")
 	ErrEcloudPasswordRequired  = errors.New("ecloud password is required")
 	ErrEmptyToken              = errors.New("empty token received")
 	ErrInvalidMedicalReportPDF = errors.New("invalid PDF for laboratory report")
@@ -142,6 +143,7 @@ type Config struct {
 	Password       string
 	HospitalNumber string
 	HospitalName   string
+	EclinicBaseUrl string
 
 	HTTPClient  HTTPClient
 	Logger      Logger
@@ -168,6 +170,10 @@ func (c *Config) Validate() error {
 
 	if c.HospitalName == "" {
 		return ErrHospitalNameRequired
+	}
+
+	if c.EclinicBaseUrl == "" {
+		return ErrEclinicBaseURL
 	}
 
 	// Set default timeout if not provided
