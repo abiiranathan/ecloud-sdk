@@ -599,7 +599,11 @@ func (c *DefaultEcloudClient) SyncMedicalRecords(ctx context.Context, patientRec
 	url := c.config.ApiBaseUrl + "/api/records"
 
 	// Perform the request
-	resp, err := c.performRequest(ctx, http.MethodPost, url, bytes.NewReader(buffer.Bytes()), headers)
+	resp, err := c.performRequest(ctx,
+		http.MethodPost,
+		url, bytes.NewReader(buffer.Bytes()),
+		headers, false)
+
 	if err != nil {
 		return fmt.Errorf("unable to sync medical records: %w", err)
 	}
