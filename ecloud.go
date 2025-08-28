@@ -469,11 +469,13 @@ func (c *DefaultEcloudClient) SyncMedicalRecords(ctx context.Context, patientRec
 	// Create a new multipart request
 	writer := multipart.NewWriter(&buffer)
 
-	// If a medical report exists, add it to multipart request.
-	if patientRecord.MedicalReport != nil {
+	// Check if facility turned off medical report uploads.
+	if c.config.UploadMedicalReport && patientRecord.MedicalReport != nil {
+		// If a medical report exists, add it to multipart request.
 		if !isValidPDF(patientRecord.LabReport) {
 			return ErrInvalidMedicalReportPDF
 		}
+
 		part, err = writer.CreateFormFile(medicalReportFieldName, medicalReportFileName)
 		if err != nil {
 			return fmt.Errorf("error creating form file: %w", err)
@@ -483,6 +485,7 @@ func (c *DefaultEcloudClient) SyncMedicalRecords(ctx context.Context, patientRec
 		if err != nil {
 			return fmt.Errorf("error writing form file: %w", err)
 		}
+
 	}
 
 	// If a lab report exists, add it to multipart request.
